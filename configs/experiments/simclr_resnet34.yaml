@@ -1,0 +1,17 @@
+# @package _global_
+# ============================================================
+# Experiment: SimCLR with ResNet-34 backbone
+# ============================================================
+# Usage:
+#   python training/train_simclr.py +experiments=simclr_resnet34
+# ============================================================
+
+defaults:
+  - override /dataset: stl10
+  - override /model: resnet34
+  - override /training: simclr
+  - override /optimizer: adam
+
+batch_size: 256
+epochs: 200
+temperature: 0.5

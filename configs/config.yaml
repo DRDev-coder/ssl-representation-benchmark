@@ -1,0 +1,55 @@
+# ============================================================
+# Hydra Root Config — SimCLR Project
+# ============================================================
+# Hydra composes the final config from the defaults below.
+#
+# Usage:
+#   python training/train_simclr.py                          # defaults
+#   python training/train_simclr.py dataset=cifar10           # switch dataset
+#   python training/train_simclr.py model=resnet34            # switch model
+#   python training/train_simclr.py batch_size=256 epochs=200 # override params
+#   python training/train_simclr.py optimizer=sgd             # switch optimizer
+#
+# Hyperparameter sweep (multirun):
+#   python training/train_simclr.py -m temperature=0.3,0.5,0.7 batch_size=128,256
+# ============================================================
+
+defaults:
+  - dataset: stl10
+  - model: resnet18
+  - training: simclr
+  - optimizer: adam
+  - method: simclr
+  - _self_
+
+# ── Global Settings ──────────────────────────────────────────
+device: cuda
+seed: 42
+batch_size: 128
+epochs: 100
+temperature: 0.5
+use_amp: true                      # Mixed precision (AMP)
+num_workers: 8
+pin_memory: true
+cudnn_benchmark: true
+
+# ── Paths ────────────────────────────────────────────────────
+paths:
+  data_dir: data
+  checkpoint_dir: checkpoints
+  results_dir: results
+  mlflow_uri: mlruns
+
+# ── MLflow ───────────────────────────────────────────────────
+mlflow:
+  enabled: true
+  experiment_name: simclr_project
+
+# ── Hydra Output Directory ───────────────────────────────────
+hydra:
+  run:
+    dir: outputs/${now:%Y-%m-%d}/${now:%H-%M-%S}
+  sweep:
+    dir: outputs/multirun/${now:%Y-%m-%d}/${now:%H-%M-%S}
+    subdir: ${hydra.job.num}
+

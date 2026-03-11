@@ -1,0 +1,8 @@
+# CIFAR-10 dataset config
+# CIFAR-10 used as alternative/secondary dataset:
+#   - 50,000 train images (labels removed for pretraining)
+#   - 10,000 test images
+#   - 10 classes, 32x32 resolution
+name: cifar10
+image_size: 32
+num_classes: 10

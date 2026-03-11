@@ -1,0 +1,6 @@
+# Linear probe evaluation config
+# Frozen encoder + single linear classifier
+name: linear_eval
+
+# Encoder to evaluate
+encoder_path: checkpoints/simclr_encoder_best.pth

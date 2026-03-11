@@ -1,0 +1,7 @@
+# ResNet-18 backbone (default — good for RTX 5060 8GB VRAM)
+backbone: resnet18
+feature_dim: 512
+projection_hidden_dim: 2048
+projection_output_dim: 128
+use_batch_norm: true
+num_classes: 10

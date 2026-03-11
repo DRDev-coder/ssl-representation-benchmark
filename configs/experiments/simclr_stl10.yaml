@@ -1,0 +1,17 @@
+# @package _global_
+# ============================================================
+# Experiment: SimCLR on STL-10 (default, full pretraining)
+# ============================================================
+# Usage:
+#   python training/train_simclr.py +experiments=simclr_stl10
+# ============================================================
+
+defaults:
+  - override /dataset: stl10
+  - override /model: resnet18
+  - override /training: simclr
+  - override /optimizer: adam
+
+batch_size: 256
+epochs: 200
+temperature: 0.5

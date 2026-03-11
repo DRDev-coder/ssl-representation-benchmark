@@ -1,0 +1,14 @@
+# SimCLR pretraining config
+name: simclr
+
+# Training-specific settings (batch_size, epochs, lr in top-level / optimizer)
+accumulation_steps: 1                  # Effective BS = batch_size * accumulation_steps
+
+# LR Schedule
+scheduler: cosine                      # "cosine" or "step"
+warmup_epochs: 10
+
+# Checkpointing
+save_every: 50                         # Save checkpoint every N epochs
+log_every: 10                          # Log metrics every N batches
+resume_from: null                      # Path to checkpoint to resume from

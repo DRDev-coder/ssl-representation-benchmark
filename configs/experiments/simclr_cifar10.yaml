@@ -1,0 +1,17 @@
+# @package _global_
+# ============================================================
+# Experiment: SimCLR on CIFAR-10
+# ============================================================
+# Usage:
+#   python training/train_simclr.py +experiments=simclr_cifar10
+# ============================================================
+
+defaults:
+  - override /dataset: cifar10
+  - override /model: resnet18
+  - override /training: simclr
+  - override /optimizer: adam
+
+batch_size: 256
+epochs: 200
+temperature: 0.5

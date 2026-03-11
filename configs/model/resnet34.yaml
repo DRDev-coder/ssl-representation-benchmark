@@ -1,0 +1,7 @@
+# ResNet-34 backbone (balance between ResNet-18 and ResNet-50)
+backbone: resnet34
+feature_dim: 512
+projection_hidden_dim: 2048
+projection_output_dim: 128
+use_batch_norm: true
+num_classes: 10

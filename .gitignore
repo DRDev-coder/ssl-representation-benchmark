@@ -1,0 +1,78 @@
+# .gitignore for SimCLR Project
+
+# Data (managed by DVC)
+data/
+*.tar.gz
+
+# Checkpoints
+checkpoints/
+*.pth
+*.pt
+
+# MLflow
+mlruns/
+
+# Results (keep folder structure but not content)
+results/*.png
+results/*.json
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+dist/
+build/
+*.egg
+
+# Virtual environments
+venv/
+env/
+.venv/
+.env/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Docker
+.dockerignore
+
+# Virtual environment
+simclr_env/
+
+# Data & checkpoints (large files)
+data/
+*.pth
+*.npz
+
+# Results & outputs
+mlruns/
+outputs/
+embeddings/
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+
+# Hydra
+.hydra/
+
+# Paper / LaTeX output (local only)
+paper/
+
+# OS
+.DS_Store
+Thumbs.db

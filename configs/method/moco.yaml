@@ -1,0 +1,7 @@
+# MoCo v2 method config
+name: moco
+
+# MoCo-specific hyperparameters
+moco_temperature: 0.07
+moco_momentum: 0.999
+moco_queue_size: 65536

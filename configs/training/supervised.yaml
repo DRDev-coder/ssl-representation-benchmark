@@ -1,0 +1,6 @@
+# Supervised baseline training config
+# Trains ResNet from scratch (no pretraining) for comparison
+name: supervised
+
+# Label fractions (same as finetune for fair comparison)
+label_fractions: [0.01, 0.10, 1.0]

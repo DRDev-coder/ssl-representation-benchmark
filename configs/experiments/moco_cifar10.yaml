@@ -1,0 +1,14 @@
+# MoCo v2 experiment preset — CIFAR-10
+defaults:
+  - override /dataset: cifar10
+  - override /model: resnet18
+  - override /optimizer: adam
+  - override /training: ssl_pretrain
+
+method: moco
+epochs: 100
+batch_size: 128
+temperature: 0.5        # global (unused by MoCo, which uses moco_temperature)
+moco_temperature: 0.07
+moco_momentum: 0.999
+moco_queue_size: 65536

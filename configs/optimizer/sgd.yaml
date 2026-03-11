@@ -1,0 +1,5 @@
+# SGD optimizer (common for large-batch SimCLR training)
+name: sgd
+lr: 0.03
+momentum: 0.9
+weight_decay: 1e-4

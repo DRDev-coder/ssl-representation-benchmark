@@ -1,0 +1,61 @@
+# Docker Compose for SimCLR project
+# Usage: docker-compose up [service_name]
+
+version: "3.8"
+
+services:
+  # ── SimCLR Training ─────────────────────────
+  simclr-train:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    volumes:
+      - ../data:/app/data
+      - ../results:/app/results
+      - ../checkpoints:/app/checkpoints
+      - ../mlruns:/app/mlruns
+    command: python -m training.train_simclr --dataset stl10 --epochs 200
+
+  # ── Evaluation ──────────────────────────────
+  simclr-eval:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    volumes:
+      - ../data:/app/data
+      - ../results:/app/results
+      - ../checkpoints:/app/checkpoints
+      - ../mlruns:/app/mlruns
+    command: >
+      bash -c "
+        python -m training.linear_probe --dataset stl10 &&
+        python -m evaluation.knn_eval --dataset stl10 &&
+        python -m training.fine_tune --dataset stl10 --fractions 0.01 0.10 1.0 &&
+        python -m training.train_supervised --dataset stl10 --fractions 0.01 0.10 1.0 &&
+        python -m evaluation.tsne_visualization --dataset stl10 --label_curve
+      "
+
+  # ── MLflow UI ───────────────────────────────
+  mlflow-ui:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    ports:
+      - "5000:5000"
+    volumes:
+      - ../mlruns:/app/mlruns
+    command: mlflow ui --host 0.0.0.0 --port 5000 --backend-store-uri /app/mlruns

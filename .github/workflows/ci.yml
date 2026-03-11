@@ -1,0 +1,136 @@
+name: SimCLR CI Pipeline
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+
+jobs:
+  # ── Lint & Type Check ─────────────────────────────────────
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install lint dependencies
+        run: pip install flake8 black isort
+      - name: Check formatting
+        run: black --check .
+      - name: Check imports
+        run: isort --check-only .
+      - name: Lint
+        run: flake8 --max-line-length 100 --ignore E501,W503 .
+
+  # ── Quick Smoke Test (CPU) ────────────────────────────────
+  test:
+    runs-on: ubuntu-latest
+    needs: lint
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: |
+          pip install --upgrade pip
+          pip install torch torchvision --index-url https://download.pytorch.org/whl/cpu
+          pip install numpy scikit-learn matplotlib mlflow tqdm pyyaml Pillow
+
+      - name: SimCLR smoke test (5 epochs, small batch)
+        run: |
+          python -m training.train_simclr \
+            --dataset cifar10 \
+            --epochs 2 \
+            --batch_size 32 \
+            --no_mlflow
+
+      - name: Verify encoder checkpoint
+        run: |
+          python -c "
+          import torch
+          state = torch.load('checkpoints/simclr_encoder_best.pth', weights_only=True)
+          print(f'Encoder checkpoint keys: {len(state)} layers')
+          assert len(state) > 0, 'Empty checkpoint!'
+          print('Smoke test passed!')
+          "
+
+  # ── SSL vs Supervised Benchmark (GPU) ─────────────────────
+  benchmark:
+    runs-on: ubuntu-latest
+    needs: test
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: |
+          pip install --upgrade pip
+          pip install torch torchvision --index-url https://download.pytorch.org/whl/cpu
+          pip install numpy scikit-learn matplotlib mlflow tqdm pyyaml Pillow
+
+      - name: Quick benchmark (CIFAR-10, 5 epochs)
+        run: |
+          echo "=== SimCLR Pretraining ==="
+          python -m training.train_simclr --dataset cifar10 --epochs 5 --batch_size 64 --no_mlflow
+
+          echo "=== Linear Evaluation ==="
+          python -m training.linear_probe --dataset cifar10 --epochs 10 --no_mlflow
+
+          echo "=== Supervised Baseline ==="
+          python -m training.train_supervised --dataset cifar10 --fractions 0.10 1.0 --epochs 10 --no_mlflow
+
+          echo "=== SimCLR Fine-Tune ==="
+          python -m training.fine_tune --dataset cifar10 --fractions 0.10 1.0 --epochs 10 --no_mlflow
+
+      - name: Compare results
+        run: |
+          python -c "
+          import json, os
+          
+          ssl_path = 'results/finetune_results.json'
+          sup_path = 'results/supervised_results.json'
+          
+          if os.path.exists(ssl_path) and os.path.exists(sup_path):
+              with open(ssl_path) as f:
+                  ssl = json.load(f)
+              with open(sup_path) as f:
+                  sup = json.load(f)
+              
+              print('=== SSL vs Supervised Comparison ===')
+              for frac in sorted(ssl.keys()):
+                  ssl_acc = ssl[frac]
+                  sup_acc = sup.get(frac, 'N/A')
+                  diff = ssl_acc - sup_acc if isinstance(sup_acc, (int, float)) else 'N/A'
+                  print(f'  {float(frac)*100:.0f}% labels: SSL={ssl_acc:.2f}% | Supervised={sup_acc:.2f}% | Diff={diff:+.2f}%')
+          else:
+              print('Results files not found — check pipeline.')
+          "
+
+  # ── Docker Build Test ─────────────────────────────────────
+  docker:
+    runs-on: ubuntu-latest
+    needs: lint
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build Docker image
+        run: docker build -t simclr-project -f docker/Dockerfile .
+      - name: Verify Docker image
+        run: |
+          docker run --rm simclr-project python -c "
+          import torch, torchvision
+          print(f'PyTorch: {torch.__version__}')
+          print(f'CUDA available: {torch.cuda.is_available()}')
+          from models.simclr_model import SimCLR
+          model = SimCLR()
+          print(f'SimCLR model loaded: {sum(p.numel() for p in model.parameters())/1e6:.1f}M params')
+          print('Docker verification passed!')
+          "

@@ -1,0 +1,4 @@
+# Adam optimizer (default — good for SimCLR pretraining)
+name: adam
+lr: 3e-4
+weight_decay: 1e-4

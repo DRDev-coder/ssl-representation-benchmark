@@ -1,0 +1,13 @@
+# BYOL experiment preset — CIFAR-10
+defaults:
+  - override /dataset: cifar10
+  - override /model: resnet18
+  - override /optimizer: adam
+  - override /training: ssl_pretrain
+
+method: byol
+epochs: 100
+batch_size: 128
+temperature: 0.5        # global (unused by BYOL)
+byol_momentum: 0.996
+byol_predictor_hidden_dim: 512

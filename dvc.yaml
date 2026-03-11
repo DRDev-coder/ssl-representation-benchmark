@@ -1,0 +1,108 @@
+stages:
+  # ──────────────────────────────────────────────────────────────
+  # Stage 1: Download & prepare datasets
+  # ──────────────────────────────────────────────────────────────
+  download_data:
+    cmd: >
+      python -c "
+      import torchvision;
+      torchvision.datasets.STL10(root='data', split='unlabeled', download=True);
+      torchvision.datasets.STL10(root='data', split='train', download=True);
+      torchvision.datasets.STL10(root='data', split='test', download=True);
+      print('STL-10 downloaded successfully.')
+      "
+    deps:
+      - configs/simclr_config.py
+    outs:
+      - data/stl10_binary:
+          cache: true
+
+  # ──────────────────────────────────────────────────────────────
+  # Stage 2: SimCLR Pretraining
+  # ──────────────────────────────────────────────────────────────
+  pretrain:
+    cmd: python -m training.train_simclr --dataset stl10 --epochs 200 --batch_size 256
+    deps:
+      - training/train_simclr.py
+      - models/simclr_model.py
+      - models/resnet_encoder.py
+      - models/projection_head.py
+      - augmentations/simclr_augmentations.py
+      - utils/losses.py
+      - data/stl10_binary
+    outs:
+      - checkpoints/simclr_encoder_best.pth:
+          cache: true
+      - checkpoints/simclr_encoder_final.pth:
+          cache: true
+    params:
+      - configs/simclr_config.py:
+          - SimCLRConfig
+
+  # ──────────────────────────────────────────────────────────────
+  # Stage 3: Linear Probe Evaluation
+  # ──────────────────────────────────────────────────────────────
+  linear_eval:
+    cmd: python -m training.linear_probe --dataset stl10 --epochs 100
+    deps:
+      - training/linear_probe.py
+      - checkpoints/simclr_encoder_best.pth
+      - data/stl10_binary
+
+  # ──────────────────────────────────────────────────────────────
+  # Stage 4: Supervised Baseline
+  # ──────────────────────────────────────────────────────────────
+  supervised_baseline:
+    cmd: python -m training.train_supervised --dataset stl10 --fractions 0.01 0.10 1.0
+    deps:
+      - training/train_supervised.py
+      - data/stl10_binary
+    outs:
+      - checkpoints/supervised_encoder_best.pth:
+          cache: true
+      - results/supervised_results.json:
+          cache: false
+
+  # ──────────────────────────────────────────────────────────────
+  # Stage 5: Semi-Supervised Fine-Tuning
+  # ──────────────────────────────────────────────────────────────
+  finetune:
+    cmd: python -m training.fine_tune --dataset stl10 --fractions 0.01 0.10 1.0
+    deps:
+      - training/fine_tune.py
+      - checkpoints/simclr_encoder_best.pth
+      - data/stl10_binary
+    outs:
+      - results/finetune_results.json:
+          cache: false
+
+  # ──────────────────────────────────────────────────────────────
+  # Stage 6: kNN Evaluation
+  # ──────────────────────────────────────────────────────────────
+  knn_eval:
+    cmd: python -m evaluation.knn_eval --dataset stl10 --k 200
+    deps:
+      - evaluation/knn_eval.py
+      - checkpoints/simclr_encoder_best.pth
+      - data/stl10_binary
+
+  # ──────────────────────────────────────────────────────────────
+  # Stage 7: Visualization
+  # ──────────────────────────────────────────────────────────────
+  visualize:
+    cmd: python -m evaluation.tsne_visualization --dataset stl10 --label_curve
+    deps:
+      - evaluation/tsne_visualization.py
+      - checkpoints/simclr_encoder_best.pth
+      - checkpoints/supervised_encoder_best.pth
+      - results/finetune_results.json
+      - results/supervised_results.json
+    outs:
+      - results/tsne_simclr.png:
+          cache: false
+      - results/tsne_supervised.png:
+          cache: false
+      - results/tsne_comparison.png:
+          cache: false
+      - results/label_efficiency_curve.png:
+          cache: false

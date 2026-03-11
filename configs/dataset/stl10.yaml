@@ -1,0 +1,9 @@
+# STL-10 dataset config
+# STL-10 is purpose-built for self-supervised learning:
+#   - 100,000 unlabeled images (96x96)
+#   - 5,000 labeled train images
+#   - 8,000 test images
+#   - 10 classes
+name: stl10
+image_size: 96
+num_classes: 10

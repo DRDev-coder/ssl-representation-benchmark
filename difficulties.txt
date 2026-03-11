@@ -1,0 +1,204 @@
+================================================================================
+  SimCLR PROJECT - DIFFICULTIES & FIXES LOG
+  Project Path: D:\DL_COURSE\Project_for_building_resume\simCLR
+================================================================================
+
+--------------------------------------------------------------------------------
+DIFFICULTY 1: Broken Virtual Environment (path mismatch)
+--------------------------------------------------------------------------------
+Date       : March 8, 2026
+Stage      : Setup / pip install
+
+Problem:
+  The project was moved from:
+    D:\DL_COURSE\DL_RESUME\simCLR\
+  to:
+    D:\DL_COURSE\Project_for_building_resume\simCLR\
+
+  The existing simclr_env virtual environment had its original creation path
+  hardcoded inside simclr_env\pyvenv.cfg and all launcher scripts (.exe files).
+  Python virtual environments are NOT relocatable on Windows.
+
+  Error seen:
+    Fatal error in launcher: Unable to create process using
+    '"D:\DL_COURSE\DL_RESUME\simCLR\simclr_env\Scripts\python.exe"
+    "D:\DL_COURSE\Project_for_building_resume\simCLR\simclr_env\Scripts\pip.exe"
+    install -r requirements.txt': The system cannot find the file specified.
+
+Fix:
+  1. Deleted the broken venv:
+       Remove-Item -Recurse -Force simclr_env
+  2. Recreated it at the correct path using absolute Python path:
+       C:\Users\Darshan\AppData\Local\Programs\Python\Python311\python.exe -m venv simclr_env
+  3. Activated and installed dependencies:
+       .\simclr_env\Scripts\Activate.ps1
+       pip install -r requirements.txt
+
+Lesson:
+  Always recreate a venv after moving a project on Windows. Never just copy
+  a venv folder to a new location.
+
+--------------------------------------------------------------------------------
+DIFFICULTY 2: PyTorch installed without CUDA support
+--------------------------------------------------------------------------------
+Date       : March 8, 2026
+Stage      : First training attempt
+
+Problem:
+  After recreating the venv, pip installed the CPU-only version of PyTorch
+  (torch-2.10.0-cp311-cp311-win_amd64.whl) because the package index used
+  was the default PyPI, not the PyTorch CUDA wheel index.
+
+  The training script printed:
+    CUDA not available. Using CPU.
+
+  On CPU, STL-10 training would take 40+ hours.
+
+Discovery:
+  GPU confirmed via: nvidia-smi
+    GPU:    NVIDIA GeForce RTX 5060 Laptop GPU
+    Driver: 581.95
+    CUDA:   13.0
+
+Fix:
+  Reinstall from the PyTorch CUDA 12.8 wheel index:
+    pip install torch torchvision torchaudio \
+      --index-url https://download.pytorch.org/whl/cu128 --upgrade
+
+  Verified with:
+    python -c "import torch; print(torch.cuda.is_available())"
+    -> True
+
+Note:
+  It turned out the requirements.txt install had already grabbed cu128 wheels
+  (torch-2.10.0+cu128). The issue was a stale __pycache__ from a previous
+  CPU torch import. After reinstall confirmation, CUDA was available.
+
+--------------------------------------------------------------------------------
+DIFFICULTY 3: Wrong PyTorch attribute name - total_mem vs total_memory
+--------------------------------------------------------------------------------
+Date       : March 8, 2026
+Stage      : First GPU training attempt
+File       : utils/device.py
+
+Problem:
+  Training crashed immediately with:
+    AttributeError: 'torch._C._CudaDeviceProperties' object has no attribute
+    'total_mem'
+
+  The code used torch.cuda.get_device_properties(0).total_mem but the correct
+  PyTorch attribute name is total_memory.
+
+  This affected 3 locations in utils/device.py:
+    - get_device() function
+    - get_device_config() function
+    - print_memory_stats() function
+
+Fix:
+  Replaced all 3 occurrences of .total_mem with .total_memory in utils/device.py
+
+--------------------------------------------------------------------------------
+DIFFICULTY 4: persistent_workers=True with num_workers=0
+--------------------------------------------------------------------------------
+Date       : March 8, 2026
+Stage      : First GPU training attempt (after fix 3)
+Files      : datasets/cifar10_dataset.py, datasets/stl10_dataset.py
+
+Problem:
+  DataLoader crashed with:
+    ValueError: persistent_workers option needs num_workers > 0
+
+  Both dataset files had persistent_workers=True hardcoded in the pretrain
+  DataLoader. On Windows, num_workers=0 is required to avoid multiprocessing
+  spawn issues, but persistent_workers cannot be True when num_workers=0.
+
+Fix:
+  Changed persistent_workers=True to persistent_workers=num_workers > 0
+  in both cifar10_dataset.py and stl10_dataset.py (pretrain loaders only).
+
+--------------------------------------------------------------------------------
+DIFFICULTY 5: MLflow Windows path parsed as URI scheme
+--------------------------------------------------------------------------------
+Date       : March 8, 2026
+Stage      : First GPU training attempt (after fix 4)
+File       : mlops/mlflow_logger.py
+
+Problem:
+  MLflow crashed when trying to initialize the tracking store:
+    KeyError: 'd'
+  followed by:
+    UnsupportedModelRegistryStoreURIException: got unsupported URI
+    'D:\DL_COURSE\Project_for_building_resume\simCLR\mlruns'
+
+  MLflow parses the tracking URI and tries to extract the scheme. On Windows,
+  bare absolute paths like D:\... have 'D' extracted as the scheme, which
+  is not in MLflow's list of supported schemes: ['', 'file', 'http', ...].
+
+Fix:
+  In mlops/mlflow_logger.py, converted the local mlruns path to a proper
+  file:// URI using Python's pathlib:
+    from pathlib import Path
+    mlruns_path = Path(project_root) / "mlruns"
+    mlruns_path.mkdir(parents=True, exist_ok=True)
+    mlflow.set_tracking_uri(mlruns_path.as_uri())
+
+  Path.as_uri() produces file:///D:/DL_COURSE/.../mlruns which MLflow
+  correctly recognises as the local filesystem scheme.
+
+--------------------------------------------------------------------------------
+DIFFICULTY 6: STL-10 dataset too large for initial testing
+--------------------------------------------------------------------------------
+Date       : March 8, 2026
+Stage      : Very first training attempt
+
+Problem:
+  The default config uses dataset=stl10 (2.64 GB download).
+  The auto-download started (got to ~10%) and would have taken ~40 min
+  on the connection at that time, then training would have been very slow
+  on CPU (before CUDA was confirmed).
+
+Fix / Workaround:
+  Switched to CIFAR-10 for all experiments:
+    python training/train_simclr.py dataset=cifar10 num_workers=0
+  CIFAR-10 is only ~170 MB and downloads in ~16 seconds.
+
+--------------------------------------------------------------------------------
+DIFFICULTY 7: TSNE n_iter renamed to max_iter in scikit-learn 1.4+
+--------------------------------------------------------------------------------
+Date       : March 9, 2026
+Stage      : Stage 6 - t-SNE Visualization
+File       : evaluation/tsne_visualization.py
+
+Problem:
+  t-SNE script crashed with:
+    TypeError: TSNE.__init__() got an unexpected keyword argument 'n_iter'
+
+  The code used sklearn's TSNE(..., n_iter=1000, ...) but scikit-learn 1.4
+  renamed this parameter to max_iter. The installed scikit-learn version is
+  >= 1.4, so n_iter is no longer accepted.
+
+Fix:
+  Changed n_iter=1000 to max_iter=1000 in evaluation/tsne_visualization.py
+  (in the plot_tsne() function, line ~109).
+
+  Old:
+    tsne = TSNE(..., n_iter=1000, ...)
+  New:
+    tsne = TSNE(..., max_iter=1000, ...)
+
+--------------------------------------------------------------------------------
+SUMMARY TABLE
+--------------------------------------------------------------------------------
+
+  #  | Category              | File(s) affected              | Status
+  ---|---                    |---                            |---
+  1  | Broken venv           | simclr_env/ (deleted)         | Fixed - recreated venv
+  2  | No CUDA in PyTorch    | requirements / pip            | Fixed - cu128 wheels
+  3  | Wrong attribute name  | utils/device.py               | Fixed - total_memory
+  4  | persistent_workers    | datasets/cifar10_dataset.py   | Fixed - conditional
+     |                       | datasets/stl10_dataset.py     |
+  5  | MLflow Windows URI    | mlops/mlflow_logger.py        | Fixed - as_uri()
+  6  | STL-10 large download | config (runtime override)     | Workaround - cifar10
+  7  | TSNE n_iter→max_iter  | evaluation/tsne_visualization | Fixed - max_iter
+
+================================================================================

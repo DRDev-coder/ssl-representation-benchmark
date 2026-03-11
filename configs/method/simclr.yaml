@@ -1,0 +1,4 @@
+# SimCLR method config
+name: simclr
+
+# SimCLR uses the global temperature setting

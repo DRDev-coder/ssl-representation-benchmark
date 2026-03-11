@@ -1,0 +1,15 @@
+# Semi-supervised fine-tuning config
+# Uses pretrained SimCLR encoder with limited labeled data
+name: finetune
+
+# Encoder to fine-tune
+encoder_path: checkpoints/simclr_encoder_best.pth
+
+# Label fractions to evaluate
+label_fractions: [0.01, 0.10, 1.0]
+
+# Whether to freeze encoder (false = full fine-tune with differential LR)
+freeze_encoder: false
+
+# Differential LR: encoder gets lr * encoder_lr_scale
+encoder_lr_scale: 0.1
